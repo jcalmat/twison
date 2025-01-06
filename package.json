@@ -1,6 +1,6 @@
 {
   "name": "Twison",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Export your Twine 2 story as a JSON document",
   "main": "format.js",
   "scripts": {
@@ -21,7 +21,7 @@
   "homepage": "https://github.com/lazerwalker/twison",
   "devDependencies": {
     "chai": "^3.4.1",
-    "express": "^4.13.3",
+    "express": "^4.21.2",
     "jsdom": "^16.3.0",
     "uglify-js": "^2.6.1",
     "watch": "^0.16.0"

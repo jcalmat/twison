@@ -14,13 +14,13 @@ var Twison = {
    * @return {Array|null}
    *   The array of link objects, containing a `name` and a `link`.
    */
-  extractLinksFromText: function(text) {
+  extractLinksFromText: function (text) {
     var links = text.match(/\[\[.+?\]\]/g);
     if (!links) {
       return null;
     }
 
-    return links.map(function(link) {
+    return links.map(function (link) {
       var differentName = link.match(/\[\[(.*?)\-\&gt;(.*?)\]\]/);
       if (differentName) {
         // [[name->link]]
@@ -30,7 +30,7 @@ var Twison = {
         };
       } else {
         // [[link]]
-        link = link.substring(2, link.length-2)
+        link = link.substring(2, link.length - 2)
         return {
           name: link,
           link: link
@@ -52,7 +52,7 @@ var Twison = {
    * @return {Object|null}
    *   An object containing all of the props found.
    */
-  extractPropsFromText: function(text) {
+  extractPropsFromText: function (text) {
     var props = {};
     var propMatch;
     var matchFound = false;
@@ -64,14 +64,22 @@ var Twison = {
 
       // Extract and sanitize the actual value.
       // This will remove any new lines.
-      const value = propMatch[3].replace(/(\r\n|\n|\r)/gm, '');
+      var value = propMatch[3].replace(/(\r\n|\n|\r)/gm, '');
 
       // We can nest props like so: {{foo}}{{bar}}value{{/bar}}{{/foo}},
       // so call this same method again to extract the values further.
       const furtherExtraction = this.extractPropsFromText(value);
 
       if (furtherExtraction !== null) {
-        props[key] = furtherExtraction;
+        value = furtherExtraction;
+      }
+
+      // transform props to an array if the key already exists
+      if (props[key]) {
+        if (!Array.isArray(props[key])) {
+          props[key] = [props[key]];
+        }
+        props[key].push(value);
       } else {
         props[key] = value;
       }
@@ -87,6 +95,24 @@ var Twison = {
   },
 
   /**
+   * Sanitize the provided text.
+   * Removes links and props from the text since they are already extracted.
+   * @param {String} text
+   *  The text to sanitize.
+   * @return {String}
+   * The sanitized text.
+   */
+  sanitizeText: function (text) {
+    // remove links
+    text = text.replace(/\[\[.+?\]\]/g, '');
+    // remove props
+    text = text.replace(/\{\{((\s|\S)+?)\}\}((\s|\S)+?)?\{\{\/\1\}\}/gm, '');
+    // remove double cariage returns
+    text = text.replace(/(\r\n|\n|\r)/gm, '');
+    return text;
+  },
+
+  /**
    * Convert an entire passage.
    *
    * @param {Object} passage
@@ -96,8 +122,8 @@ var Twison = {
    *   Object containing specific passage data. Examples include `name`, `pid`,
    *   `position`, etc.
    */
-  convertPassage: function(passage) {
-  	var dict = {text: passage.innerHTML};
+  convertPassage: function (passage) {
+    var dict = { text: passage.innerHTML };
 
     var links = Twison.extractLinksFromText(dict.text);
     if (links) {
@@ -109,14 +135,16 @@ var Twison = {
       dict.props = props;
     }
 
-    ["name", "pid", "position", "tags"].forEach(function(attr) {
+    dict.text = Twison.sanitizeText(dict.text);
+
+    ["name", "pid", "position", "tags"].forEach(function (attr) {
       var value = passage.attributes[attr].value;
       if (value) {
         dict[attr] = value;
       }
     });
 
-    if(dict.position) {
+    if (dict.position) {
       var position = dict.position.split(',')
       dict.position = {
         x: position[0],
@@ -129,7 +157,7 @@ var Twison = {
     }
 
     return dict;
-	},
+  },
 
   /**
    * Convert an entire story.
@@ -140,7 +168,7 @@ var Twison = {
    * @return {Object}
    *   Object containing processed "passages" of data.
    */
-  convertStory: function(story) {
+  convertStory: function (story) {
     var passages = story.getElementsByTagName("tw-passagedata");
     var convertedPassages = Array.prototype.slice.call(passages).map(Twison.convertPassage);
 
@@ -148,7 +176,7 @@ var Twison = {
       passages: convertedPassages
     };
 
-    ["name", "startnode", "creator", "creator-version", "ifid"].forEach(function(attr) {
+    ["name", "startnode", "creator", "creator-version", "ifid"].forEach(function (attr) {
       var value = story.attributes[attr].value;
       if (value) {
         dict[attr] = value;
@@ -157,13 +185,13 @@ var Twison = {
 
     // Add PIDs to links
     var pidsByName = {};
-    dict.passages.forEach(function(passage) {
+    dict.passages.forEach(function (passage) {
       pidsByName[passage.name] = passage.pid;
     });
 
-    dict.passages.forEach(function(passage) {
+    dict.passages.forEach(function (passage) {
       if (!passage.links) return;
-      passage.links.forEach(function(link) {
+      passage.links.forEach(function (link) {
         link.pid = pidsByName[link.link];
         if (!link.pid) {
           link.broken = true;
@@ -177,7 +205,7 @@ var Twison = {
   /**
    * The entry-point for converting Twine data into the Twison format.
    */
-  convert: function() {
+  convert: function () {
     var storyData = document.getElementsByTagName("tw-storydata")[0];
     var json = JSON.stringify(Twison.convertStory(storyData), null, 2);
     document.getElementById("output").innerHTML = json;
